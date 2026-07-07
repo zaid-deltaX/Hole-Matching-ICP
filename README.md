@@ -1,6 +1,6 @@
 # Smart Factory V2
 
-This repository contains a Python-based computer vision pipeline for quality-control inspection workflows. The code focuses on loading ground-truth labels, running object detection, and aligning bounding boxes using ICP-style matching logic.
+Ground-truth labels, running object detection, and aligning bounding boxes using ICP-style matching logic.
 
 ## What is included
 
@@ -17,8 +17,6 @@ The project currently includes:
 - `code/` – main Python source files
 - `models/` – expected location for model weights (not tracked)
 - `sample_dataset/` – expected location for example images and labels (not tracked)
-- `qc_vision_results/` – generated output images/results (ignored)
-- `qc_vision_results_failed_img/` – generated failure-case outputs (ignored)
 
 ## Requirements
 
@@ -46,5 +44,4 @@ Other useful scripts in the repository include:
 ## Notes
 
 - Model files and image/data assets are intentionally not included in this repository.
-- Place your own model weights under `models/` and dataset files under `sample_dataset/` before running the pipeline.
-- Generated result folders are ignored by Git so the repository stays focused on source code.
+- Place model weights under `models/` and dataset files under `sample_dataset/` before running the pipeline.

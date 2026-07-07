@@ -107,7 +107,7 @@ def closest_point_matching2(source, target, match_thesh = 50):
 
 # --- UPGRADED HIGH-PRECISION ALIGNMENT FUNCTIONS ---
 
-def get_optimal_translation_voting(source, target, tolerance=10.0):
+def get_optimal_translation_voting(source, target, tolerance=5.0):
     """
     Finds the optimal 2D translation using continuous density estimation (KD-Tree)
     to guarantee finding the true mode without histogram bin-splitting artifacts.
@@ -320,7 +320,7 @@ def transform_gt_bbox_homography_zahid2(
                     cv2.putText(original_img, "Ground Truth", (20, 40),
                                 cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
 
-                    cv2.putText(icp_img, "Detections + ICP Result", (20, 40),
+                    cv2.putText(icp_img, "Detections + NEW ICP", (20, 40),
                                 cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
 
                     # Stack horizontally

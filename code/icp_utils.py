@@ -1,10 +1,10 @@
 import numpy as np
 import cv2
+import os
 from shapely.geometry import Polygon
 
 from scipy.optimize import linear_sum_assignment
 from scipy.spatial import distance
-from scipy.spatial import cKDTree
 
 from DetectionResult import DetectionResult
 from gtholebox import GTHoleBox
@@ -12,8 +12,10 @@ from typing import List, Dict
 import os
 
 
-os.environ["QT_QPA_FONTDIR"] = "/usr/share/fonts"
-os.environ["XDG_SESSION_TYPE"] = "xcb"
+# os.environ["QT_QPA_FONTDIR"] = "/usr/share/fonts"
+# os.environ["XDG_SESSION_TYPE"] = "xcb"
+# os.environ["QT_QPA_PLATFORM"] = "xcb"
+
 
 
 # os.environ["QT_QPA_PLATFORM"] = "xcb"
@@ -88,8 +90,9 @@ def opencv_plot(img_, list_of_bbox_det, list_of_bbox_gt, win_name='default',
     cv2.imshow(win_name, img_)
     cv2.waitKey(1)
 
+
 def opencv_plot2(img_, list_of_bbox_det, list_of_bbox_gt,  win_name='default',
-                 save_path=None):
+                 show=True):
 
     idx = 0 
     for points_trg in list_of_bbox_gt:
@@ -103,50 +106,13 @@ def opencv_plot2(img_, list_of_bbox_det, list_of_bbox_gt,  win_name='default',
         cv2.rectangle(img_, (int(points_src[0]), int(points_src[1])), (int(points_src[2]), int(points_src[3])), (255,0,0), 2)
         cv2.putText(img_, str(idx), (int(points_src[0]), int(points_src[1])), 1,1, (255,0,0), 1)
         idx += 1
-    # if save_path is not None:
-    #     cv2.imwrite(save_path, img_)
-    #     return
-    cv2.namedWindow(win_name, cv2.WINDOW_NORMAL)
-    cv2.imshow(win_name, img_)
-    cv2.waitKey(1)
+    if show:
+        cv2.namedWindow(win_name, cv2.WINDOW_NORMAL)
+        cv2.imshow(win_name, img_)
+        cv2.waitKey(1)
 
     return img_
 
-def closest_point_matching_mutual(
-    source,
-    target,
-    match_thresh=30
-):
-    src_tree = cKDTree(source)
-    # print(f"Source Tree : {src_tree}")
-    tgt_tree = cKDTree(target)
-
-    src_dist, src_nn = tgt_tree.query(source, k=1)
-    tgt_dist, tgt_nn = src_tree.query(target, k=1)
-
-    src_idx = []
-    tgt_idx = []
-
-    for s_idx, t_idx in enumerate(src_nn):
-
-        if src_dist[s_idx] > match_thresh:
-            continue
-
-        if tgt_nn[t_idx] == s_idx:
-            src_idx.append(s_idx)
-            tgt_idx.append(t_idx)
-
-    src_idx = np.array(src_idx)
-    tgt_idx = np.array(tgt_idx)
-
-    error = np.sum(
-        np.linalg.norm(
-            source[src_idx] - target[tgt_idx],
-            axis=1
-        )
-    )
-
-    return src_idx, tgt_idx, error
 
 def closest_point_matching2(source, target, match_thesh = 30):  # need to optimize this func
     hung_mat = distance.cdist(source, target, 'euclidean') # is the much faster version of above loop based version
@@ -211,8 +177,8 @@ def icp2_zahid(source, target):
 
             # src_idx, tgt_idx = closest_point_matching2(transformed_source, target)
 
-            src_idx, tgt_idx, distances = closest_point_matching_mutual(transformed_source, target)
-            # src_idx, tgt_idx, distances = closest_point_matching2(transformed_source, target)
+            # src_idx, tgt_idx, distances = closest_point_matching_mutual(transformed_source, target)
+            src_idx, tgt_idx, distances = closest_point_matching2(transformed_source, target)
 
             distances = abs(distances) + abs(len(src_idx)-len(source))*(closest_point_matching_threshold+5) # panelity factor in case all the holes are not matched
 
@@ -283,7 +249,8 @@ def transform_gt_bbox_homography_zahid2(
     img_dict={},
     outdir='icp_out/',
     SAVE_RES=False,
-    DISPLAY=False
+    DISPLAY=False,
+    output_filename = None
 ):
     additional_patch = 10
     transformed_gt_array = []
@@ -305,8 +272,11 @@ def transform_gt_bbox_homography_zahid2(
         gt_box_arr = [gt_box.get_hole_box() for gt_box in gt_bbox_dict[cam_id]]
         det_bbox_2d, det_centers_2d = convert_bbox_to_ndarray(det_box_arr)
         gt_bbox_2d, gt_centers_2d = convert_bbox_to_ndarray(gt_box_arr)
-        if DISPLAY:
-            img = img_dict[cam_id]
+        # if DISPLAY:
+        #     img = img_dict[cam_id]
+        if DISPLAY or SAVE_RES:
+            gt_img = img_dict[cam_id]["gt"]
+            target_img = img_dict[cam_id]["target"]
 
         target = det_centers_2d
         source = gt_centers_2d
@@ -316,8 +286,12 @@ def transform_gt_bbox_homography_zahid2(
         if det_bbox_2d.shape[0] > 0:
             try:
                 if DISPLAY:
-                    opencv_plot2(img.copy(), one_array_to_list_of_bbox2(det_bbox_2d), one_array_to_list_of_bbox2(gt_bbox_2d), win_name='Initial Alignment')
-
+                    # opencv_plot2(
+                    #     target_img.copy(),
+                    #     one_array_to_list_of_bbox2(det_bbox_2d),
+                    #     one_array_to_list_of_bbox2(gt_bbox_2d),
+                    #     win_name='Initial Alignment'
+                    # )
                     # draw_registration_result(source, target, trans_init, img.copy(), len(xco), win_name='Initial Alignment')
                     # print('Source Shape : ', source.shape)
             # print('Target shape :', target.shape)
@@ -343,11 +317,74 @@ def transform_gt_bbox_homography_zahid2(
                             transformed_gt_bbox = check_bbox_flip(transformed_gt_bbox_affine, transformed_gt_bbox)
                             
                 
-                if DISPLAY:
-                    result_img = opencv_plot2(img.copy(), one_array_to_list_of_bbox2(det_bbox_2d), one_array_to_list_of_bbox2(transformed_gt_bbox), win_name='P2P ICP')
+                if DISPLAY or SAVE_RES:
+
+                    original_img = opencv_plot2(
+                        gt_img.copy(),
+                        [],
+                        one_array_to_list_of_bbox2(gt_bbox_2d),
+                        show=False
+                    )
+
+                    icp_img = opencv_plot2(
+                        target_img.copy(),
+                        one_array_to_list_of_bbox2(det_bbox_2d),
+                        one_array_to_list_of_bbox2(transformed_gt_bbox),
+                        show=False
+                    )
+
+                    cv2.putText(
+                        original_img,
+                        "Ground Truth",
+                        (20, 40),
+                        cv2.FONT_HERSHEY_SIMPLEX,
+                        1,
+                        (0, 255, 0),
+                        2
+                    )
+
+                    cv2.putText(
+                        icp_img,
+                        "Detections + Old ICP",
+                        (20, 40),
+                        cv2.FONT_HERSHEY_SIMPLEX,
+                        1,
+                        (0, 255, 0),
+                        2
+                    )
+
+                    combined_img = np.hstack(
+                        (original_img, icp_img)
+                    )
+
+                    if DISPLAY:
+                        cv2.namedWindow(
+                            "ICP Comparison",
+                            cv2.WINDOW_NORMAL
+                        )
+                        cv2.imshow(
+                            "ICP Comparison",
+                            combined_img
+                        )
 
                     if SAVE_RES:
-                        cv2.imwrite(f'{outdir}/{cam_id}.jpg', result_img)
+                        os.makedirs(outdir, exist_ok=True)
+
+                        save_path = os.path.join(
+                            outdir,
+                            output_filename
+                            if output_filename
+                            else f"{cam_id}.jpg"
+                        )
+
+                        ok = cv2.imwrite(
+                            save_path,
+                            combined_img
+                        )
+
+                        print(
+                            f"Save {'SUCCESS' if ok else 'FAILED'}: {save_path}"
+                        )
 
                 if DISPLAY:
                     cv2.waitKey(0)

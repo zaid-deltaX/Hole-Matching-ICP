@@ -4,6 +4,7 @@ import cv2
 
 # from icp_utils_v2 import opencv_plot, opencv_plot2, transform_gt_bbox_homography_zahid2
 # from vector_voting_icp import transform_gt_bbox_homography_zahid2
+# from icp_utils import transform_gt_bbox_homography_zahid2
 from qc_vision_pipeline import transform_gt_bbox_homography_zahid2
 
 # from qt_viewer import show_results
@@ -20,21 +21,26 @@ os.environ["QT_QPA_PLATFORM"] = "xcb"
 # os.environ["DISPLAY"] = ":0"     
 # os.environ.pop("QT_QPA_PLATFORM_PLUGIN_PATH", None)
 
-
+# output_path = "../results/old_icp/"
+output_path = "../results/new_icp/"
 
 def main():
 
     # ------------------------------------------------------
     # Dataset Paths
     # ------------------------------------------------------
-    gt_image_path = "../sample_dataset/Ground_truth/5.png"
-    gt_json_path = "../sample_dataset/Ground_truth/5.json"
+    # gt_image_path = "../sample_dataset/Ground_truth/5.png"
+    # gt_json_path = "../sample_dataset/Ground_truth/5.json"
 
-    target_image_path = "../sample_dataset/orginal_img/5/C0004_D20250205T171040.png"
+    # target_image_path = "../sample_dataset/orginal_img/5/C0004_D20250205T171040.png"
         # ------------------------------------------------------
     # gt_image_path = "../sample_dataset/Ground_truth/3.png"
     # gt_json_path = "../sample_dataset/Ground_truth/3.json"
-    # target_image_path = "../sample_dataset/failed_img/3/C0002_D20250205T172227.png"
+    # target_image_path = "../sample_dataset/orginal_img/3/C0002_D20250205T171040.png"
+
+    gt_image_path = "../sample_dataset/Ground_truth/15.png"
+    gt_json_path = "../sample_dataset/Ground_truth/15.json"
+    target_image_path = "../sample_dataset/orginal_img/15/C0014_D20250205T171406.png"
     # ------------------------------------------------------
 
     img_gt = cv2.imread(gt_image_path)
@@ -116,8 +122,8 @@ def main():
                     "target": img_target
                 }
             },
-            outdir='../results/',
-            SAVE_RES=False,
+            outdir=output_path,
+            SAVE_RES=True,
             DISPLAY=True
         )
     )

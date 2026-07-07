@@ -1,0 +1,41 @@
+# Python bytecode and caches
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Jupyter / editor artifacts
+.ipynb_checkpoints/
+.vscode/
+.idea/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Large data and generated outputs
+sample_dataset/
+models/
+qc_vision_results/
+qc_vision_results_failed_img/
+results/
+*.png
+*.jpg
+*.jpeg
+*.tif
+*.tiff
+*.bmp
+*.json
+*.pt
+*.weights
+*.onnx
+
+# Logs and temporary files
+*.log
+*.tmp
+*.swp

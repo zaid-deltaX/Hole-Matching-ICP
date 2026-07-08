@@ -4,8 +4,8 @@ import cv2
 
 # from icp_utils_v2 import opencv_plot, opencv_plot2, transform_gt_bbox_homography_zahid2
 # from vector_voting_icp import transform_gt_bbox_homography_zahid2
-# from icp_utils import transform_gt_bbox_homography_zahid2
-from qc_vision_pipeline import transform_gt_bbox_homography_zahid2
+from icp_utils import transform_gt_bbox_homography_zahid2
+# from qc_vision_pipeline import transform_gt_bbox_homography_zahid2
 
 # from qt_viewer import show_results
 from utils import load_detections_from_yolo, load_gt_from_labelme

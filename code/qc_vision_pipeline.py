@@ -273,13 +273,13 @@ def transform_gt_bbox_homography_zahid2(
             # print('Target shape :', target.shape)
                     start = time.perf_counter()
                     T, baseline_fit_error, trans_src, trans_tgt = icp2_zahid(source, target)
-                    print(f"\n[QC Vision] Time: {(time.perf_counter()-start)*1000:.3f} ms")
+                    print(f"\n[New ICP] Time: {(time.perf_counter()-start)*1000:.3f} ms")
                     # T, baseline_fit_error, trans_src, trans_tgt = icp2_zahid(source, target, img.copy())
                 else:
                     start = time.perf_counter()
 
                     T, baseline_fit_error, trans_src, trans_tgt = icp2_zahid(source, target)
-                    print(f"\n[QC Vision] Time: {(time.perf_counter()-start)*1000:.3f} ms")
+                    print(f"\n[New ICP] Time: {(time.perf_counter()-start)*1000:.3f} ms")
 
 
                 transformed_gt_bbox = gt_bbox_2d + T

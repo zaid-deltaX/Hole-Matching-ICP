@@ -1,3 +1,5 @@
+import time
+
 import numpy as np
 import cv2
 import os
@@ -295,10 +297,18 @@ def transform_gt_bbox_homography_zahid2(
                     # draw_registration_result(source, target, trans_init, img.copy(), len(xco), win_name='Initial Alignment')
                     # print('Source Shape : ', source.shape)
             # print('Target shape :', target.shape)
+                    start = time.perf_counter()
+    
                     T, baseline_fit_error, trans_src, trans_tgt = icp2_zahid(source, target)
+                    print(f"\n[Old ICP] Time: {(time.perf_counter()-start)*1000:.3f} ms")
+
                     # T, baseline_fit_error, trans_src, trans_tgt = icp2_zahid(source, target, img.copy())
                 else:
+                    start = time.perf_counter()
+
                     T, baseline_fit_error, trans_src, trans_tgt = icp2_zahid(source, target)
+                    print(f"\n[Old ICP] Time: {(time.perf_counter()-start)*1000:.3f} ms")
+
 
                 transformed_gt_bbox = gt_bbox_2d + T
 

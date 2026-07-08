@@ -19,8 +19,10 @@ env/
 Thumbs.db
 
 # Large data and generated outputs
-sample_dataset/
-models/
+sample_dataset/*
+!sample_dataset/.gitkeep
+models/*
+!models/.gitkeep
 qc_vision_results/
 qc_vision_results_failed_img/
 results/

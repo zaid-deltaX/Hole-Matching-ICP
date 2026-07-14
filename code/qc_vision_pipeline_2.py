@@ -11,6 +11,12 @@ from DetectionResult import DetectionResult
 from gtholebox import GTHoleBox
 from typing import List, Dict
 
+# Panel image dimensions (kept as named constants so the bounds check and the
+# patch-clipping logic can't silently drift apart, as they had before: one used
+# 2471x2063 for the bounds check and another spot used 2473x2063 for clipping).
+IMG_WIDTH = 2473
+IMG_HEIGHT = 2063
+
 
 def convert_bbox_to_ndarray(list_of_bbox: List[float]):
     out_centers = np.zeros((len(list_of_bbox),2))
@@ -26,7 +32,11 @@ def convert_bbox_to_ndarray(list_of_bbox: List[float]):
 
 def transform_icp(src, transformation):
     src.transform(transformation)
-    src_trans_np = np.asarray(src.points, dtype=np.uint)
+    # NOTE: previously cast to np.uint, which silently wraps any negative
+    # coordinate (very possible after a real transform) into a huge positive
+    # number instead of raising an error. float preserves the true values;
+    # cast to int only at the point where you need pixel indices.
+    src_trans_np = np.asarray(src.points, dtype=np.float64)
 
     return src_trans_np
 
@@ -43,15 +53,11 @@ def one_array_to_list_of_bbox(in_array):
 
 def one_array_to_list_of_bbox2(in_array):
     '''
-    To convert the data type to the one for visualization purpose using opencv_plot2 function
+    Was a byte-for-byte duplicate of one_array_to_list_of_bbox (only used
+    .shape[0] instead of len(), which is equivalent for a numpy array).
+    Kept as a thin alias so existing call sites don't need to change.
     '''
-    list_of_bbox = []
-    idx = 0
-    for _ in range(int((in_array.shape[0])/2)):
-        list_of_bbox.append([in_array[idx][0], in_array[idx][1], in_array[idx+1][0], in_array[idx+1][1]])
-        idx = idx + 2
-
-    return list_of_bbox
+    return one_array_to_list_of_bbox(in_array)
 
 
 def opencv_plot(img_, list_of_bbox_det, list_of_bbox_gt, win_name='default'):
@@ -96,11 +102,15 @@ def opencv_plot2(
     list_of_bbox_gt,
     win_name='default',
     show=True,
-    hole_ids=None
+    hole_ids=None,
+    det_labels=None
 ):
 
     if hole_ids is None:
         hole_ids = [""] * len(list_of_bbox_gt)
+
+    if det_labels is None:
+        det_labels = [str(i) for i in range(len(list_of_bbox_det))]
 
     # Draw ICP (GT) boxes
     for points_trg, hole_id in zip(list_of_bbox_gt, hole_ids):
@@ -135,9 +145,10 @@ def opencv_plot2(
             2,
         )
 
+        label = det_labels[idx] if idx < len(det_labels) else str(idx)
         # cv2.putText(
         #     img_,
-        #     str(idx),
+        #     str(label),
         #     (int(points_src[0]), int(points_src[1])),
         #     cv2.FONT_HERSHEY_SIMPLEX,
         #     0.7,
@@ -202,9 +213,10 @@ def icp2_zahid(source, target, img=None):
     Perform high-accuracy alignment using Density Voting and a 2-Pass Refinement.
     """
     match_thresh = 50
+    empty_idx = np.array([], dtype=int)
 
     if len(source) == 0 or len(target) == 0:
-        return np.array([0.0, 0.0]), 1000000, source, target
+        return np.array([0.0, 0.0]), 1000000, source, target, empty_idx, empty_idx
 
     # --- PASS 1: Global Shift via Continuous Density Voting ---
     T = get_optimal_translation_voting(source, target, tolerance=50.0) 
@@ -219,7 +231,7 @@ def icp2_zahid(source, target, img=None):
     tgt_idx = col_ind[valid_mask]
     
     if len(src_idx) == 0:
-        return T, 1000000, transformed_source, target
+        return T, 1000000, transformed_source, target, empty_idx, empty_idx
 
     # --- PASS 2: Inlier Refinement ---
     # Calculate the exact translation ONLY between the confirmed matched pairs.
@@ -240,7 +252,7 @@ def icp2_zahid(source, target, img=None):
     f_tgt_idx = f_col_ind[f_valid_mask]
     
     if len(f_src_idx) == 0:
-        return refined_T, 1000000, final_transformed_source, target
+        return refined_T, 1000000, final_transformed_source, target, empty_idx, empty_idx
 
     final_error = final_dist_matrix[f_src_idx, f_tgt_idx].sum()
     final_matched_src = final_transformed_source[f_src_idx]
@@ -303,16 +315,23 @@ def transform_gt_bbox_homography_zahid2(
     additional_patch = 10
     transformed_gt_array = []
     ret_hole_id_dict = {}
+    # Hole IDs whose GT box did NOT get a Hungarian-matched detection within
+    # match_thresh. This is the "unmatched" list for the QC report — separate
+    # from ret_hole_id_dict, which includes every in-bounds hole regardless of
+    # whether it was actually matched.
+    unmatched_hole_id_dict = {}
     
     # print(f"Length Keys in gt bbox dict : {list(gt_bbox_dict.keys())}")
     
-    for cam_id in range(total_cams-1):
+    for cam_id in range(total_cams):
         ret_hole_id_dict[cam_id] = []
         
         # Skip if camera ID not in dictionaries
         if cam_id not in gt_bbox_dict or cam_id not in detection_dict:
             print(f"Camera ID {cam_id} not found in gt_bbox_dict or detection_dict")
             ret_hole_id_dict[cam_id] = hole_id_dict.get(cam_id, [])
+            # No detections/GT to work with at all -> every hole counts as unmatched.
+            unmatched_hole_id_dict[cam_id] = list(hole_id_dict.get(cam_id, []))
             transformed_gt_array.append([])
             continue
             
@@ -328,6 +347,11 @@ def transform_gt_bbox_homography_zahid2(
         source = gt_centers_2d
 
         transformed_gt_bbox = gt_bbox_2d.copy()
+
+        # Default to "nothing matched" so this is always defined, whether
+        # there are zero detections, or an exception fires before/while ICP runs.
+        matched_gt_idx = np.array([], dtype=int)
+        matched_det_idx = np.array([], dtype=int)
 
         if det_bbox_2d.shape[0] > 0:
             try:
@@ -376,8 +400,15 @@ def transform_gt_bbox_homography_zahid2(
                 hungarian_hole_ids = [""] * len(one_array_to_list_of_bbox2(transformed_gt_bbox))
 
                 # Fill only matched GT boxes with their original hole IDs
+                # Also build matching labels for the detection boxes so the
+                # "Detections + NEW ICP" panel shows which hole each detection
+                # was actually matched to (unmatched detections keep a "?idx" label).
+                det_labels = [f"?{i}" for i in range(len(det_bbox_2d) // 2)]
                 for gt_idx, det_idx in zip(matched_gt_idx, matched_det_idx):
-                    hungarian_hole_ids[gt_idx] = hole_id_array[gt_idx]
+                    if gt_idx < len(hole_id_array):
+                        hungarian_hole_ids[gt_idx] = hole_id_array[gt_idx]
+                        if det_idx < len(det_labels):
+                            det_labels[det_idx] = str(hole_id_array[gt_idx])
 
                 if DISPLAY or SAVE_RES:
                     # Original image with GT boxes
@@ -395,7 +426,8 @@ def transform_gt_bbox_homography_zahid2(
                         one_array_to_list_of_bbox2(det_bbox_2d),
                         one_array_to_list_of_bbox2(transformed_gt_bbox),
                         show=False,
-                        hole_ids=hungarian_hole_ids
+                        hole_ids=hungarian_hole_ids,
+                        det_labels=det_labels
                     )
 
                     # Add labels
@@ -443,7 +475,7 @@ def transform_gt_bbox_homography_zahid2(
                 w = int(bb[2])-int(bb[0])
                 h = int(bb[3])-int(bb[1])
                 #print("transform bb", bb, w, h)
-                if (w > 0) and (w < 2471) and (h > 0) and (h < 2063):
+                if (w > 0) and (w < IMG_WIDTH) and (h > 0) and (h < IMG_HEIGHT):
                     if (bb[0] < 10000) and (bb[1] < 10000) and (bb[2] < 10000) and (bb[3] < 10000) :
 
                         '''
@@ -454,9 +486,9 @@ def transform_gt_bbox_homography_zahid2(
                         if (image_patch.shape[0] > 0) and (image_patch.shape[1] > 0):
                         '''
                         y_min = max(int(bb[1]) - additional_patch, 0)
-                        y_max = min(int(bb[3] + additional_patch), 2063)
+                        y_max = min(int(bb[3] + additional_patch), IMG_HEIGHT)
                         x_min = max(int(bb[0]) - additional_patch, 0)
-                        x_max = min(int(bb[2]) + additional_patch, 2473)
+                        x_max = min(int(bb[2]) + additional_patch, IMG_WIDTH)
 
                         if ((x_max-x_min) > 0) and (y_max-y_min) > 0:
                             #print("transfirm", bb, w, h)
@@ -480,6 +512,18 @@ def transform_gt_bbox_homography_zahid2(
                             if bi < len(hole_id_array):
                                 ret_hole_id_dict[cam_id].append(hole_id_array[bi])
                     
+        # ----------------------------------------------------------
+        # Unmatched hole IDs for this camera: any GT hole whose index
+        # never showed up in matched_gt_idx (i.e. Hungarian assignment
+        # found no detection for it within match_thresh).
+        # ----------------------------------------------------------
+        matched_idx_set = set(int(i) for i in matched_gt_idx)
+        unmatched_hole_id_dict[cam_id] = [
+            hole_id_array[i]
+            for i in range(len(hole_id_array))
+            if i not in matched_idx_set
+        ]
+
         #transformed_gt_array.append(one_array_to_list_of_bbox(transformed_det_bbox))
         transformed_gt_array.append(confirmed_array)
 
@@ -495,7 +539,7 @@ def transform_gt_bbox_homography_zahid2(
         #    image_patches[cam_i] = []
         #    for bi, bbox in enumerate(bbox_array):
 
-    return transformed_gt_array, ret_hole_id_dict
+    return transformed_gt_array, ret_hole_id_dict, unmatched_hole_id_dict
 
 
 def image_patch_for_cls_transformed(images, transformed_gt_bbox_array):
@@ -506,9 +550,9 @@ def image_patch_for_cls_transformed(images, transformed_gt_bbox_array):
 
         for bi, bbox in enumerate(bbox_array):
             image_patch = images[cam_i][max(int(bbox[1])-additional_patch, 0):
-                                        min(int(bbox[3]+additional_patch), 2063),
+                                        min(int(bbox[3]+additional_patch), IMG_HEIGHT),
                           max(int(bbox[0])-additional_patch, 0):
-                          min(int(bbox[2])+additional_patch, 2473)]
+                          min(int(bbox[2])+additional_patch, IMG_WIDTH)]
             if (image_patch.shape[0] > 0)  and (image_patch.shape[1] > 0) :
                 image_patches[cam_i].append(image_patch)
     return image_patches

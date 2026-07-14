@@ -116,7 +116,7 @@ def opencv_plot2(img_, list_of_bbox_det, list_of_bbox_gt,  win_name='default',
     return img_
 
 
-def closest_point_matching2(source, target, match_thesh = 30):  # need to optimize this func
+def closest_point_matching2(source, target, match_thesh = 15):  # need to optimize this func
     hung_mat = distance.cdist(source, target, 'euclidean') # is the much faster version of above loop based version
     # print(f'Hungarian Matrix : {hung_mat}')
     hung_mat[np.where(hung_mat > match_thesh)] = 10000 # to debug the issue related to linear_sum_assignment returning wrong  values

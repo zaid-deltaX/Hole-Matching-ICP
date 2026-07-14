@@ -19,7 +19,7 @@ os.environ["QT_QPA_PLATFORM"] = "xcb"
 # Point this at ONE camera folder at a time, e.g. ".../target/7"
 # The folder name itself (must be a plain number, e.g. "7") is used both to
 # find the matching GT image/json AND as the Excel column (1-42).
-TARGET_FOLDER = "/home/mohammad/projects/smart_factory/sample_dataset/target/35"
+TARGET_FOLDER = "/home/mohammad/projects/smart_factory/sample_dataset/target/42"
 
 GT_ROOT = "../sample_dataset//Ground_truth_v2"
 OUTPUT_ROOT = "../qc_vision_results"
